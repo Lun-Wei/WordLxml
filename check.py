@@ -8,10 +8,8 @@ import shutil
 import time
 import os
 import tempfile
-import chardet
 
 Docx_Filename= raw_input("please input the path of your docx:")
-#Docx_Filename = sys.argv[1]
 Rule_Filename='rules.txt'
 
 word_schema='{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
@@ -43,7 +41,7 @@ def get_ptext(w_p):
         if _check_element_is(node,'t'):
 #-----------------------------------------------
             ptext += node.text
-    return ptext.encode(Unicode_bt,'ignore')#被检测的论文中可能出现奇怪的根本无法解码字符比如该同学从其他地方乱粘贴东西，因此加上个ignore参数忽略非法字符
+    return ptext.encode(Unicode_bt,'ignore') #被检测的论文中可能出现奇怪的根本无法解码字符比如该同学从其他地方乱粘贴东西，因此加上个ignore参数忽略非法字符
 
 #得到标题的等级
 def get_level(w_p):
@@ -103,9 +101,9 @@ def assign_fd(node,d):
 #------20160314 zqd----------------------------------
         if _check_element_is(detail,'rFonts'):
             if has_key(detail,'eastAsia'):#有此属性
-                d['fontCN'] = get_val(detail,'eastAsia')
+                d['fontCN'] = get_val(detail,'eastAsia').encode(Unicode_bt)
             if has_key(detail,'ascii'):
-                d['fontEN'] = get_val(detail,'ascii')
+                d['fontEN'] = get_val(detail,'ascii').encode(Unicode_bt)
 #--------------------------------------------
         
         elif _check_element_is(detail,'sz'):
@@ -525,8 +523,7 @@ def read_rules(filename):
                }
     
     rules_dct={}        
-    for lines in f:
-        line = lines.decode()
+    for line in f:
         if line.startswith('{'):
             group=line[1:-3].split(',')
             for factor in group:
@@ -708,8 +705,8 @@ def check_out(rule,to_check,locate,paraNum,paragr):
                             for rfonts in _iter(r,"rFonts"):
                                 if has_key(rfonts,'eastAsia'):
                                     flag = 0
-                                    if get_val(rfonts, 'eastAsia') not in font_CN:
-                                        font_CN.append(get_val(rfonts,"eastAsia"))
+                                    if get_val(rfonts, 'eastAsia').encode(Unicode_bt) not in font_CN:
+                                        font_CN.append(get_val(rfonts,"eastAsia").encode(Unicode_bt))
                                 break
                             if flag == 1:
                                 if to_check[key] not in font_CN:
@@ -719,15 +716,14 @@ def check_out(rule,to_check,locate,paraNum,paragr):
                             for rfonts in _iter(r,"rFonts"):
                                 if has_key(rfonts,"ascii"):
                                     flag = 0
-                                    if get_val(rfonts,"ascii") not in font_EN:
-                                        font_EN.append(get_val(rfonts,"ascii"))
+                                    if get_val(rfonts,"ascii").encode(Unicode_bt) not in font_EN:
+                                        font_EN.append(get_val(rfonts,"ascii").encode(Unicode_bt))
                                 break
                             if flag == 1:
                                 if to_check[key] not in font_EN:
                                     font_EN.append(to_check[key])
                     if key == "fontCN":
-                        print font_CN[0]
-                        if len(font_CN) > 1 or font_CN[0] != rule[key].decode():
+                        if len(font_CN) > 1 or font_CN[0] != rule[key]:
                             rp.write('    '+errorTypeDescrip[key]+'是')
                             if location not in['menuFirst','menuSecond','menuThird']:
                                 comment_txt.write(errorTypeDescrip[key]+'是')
@@ -741,7 +737,7 @@ def check_out(rule,to_check,locate,paraNum,paragr):
                             errorInfo.append('\'type\':\''+errorTypeName[key]+'\',\'correct\':\''+rule[key]+'\'')
                             rp1.write(str(paraNum)+'_'+locate+'_error_'+ key+'_'+ rule[key]+'\n')
                     elif key == "fontEN":
-                        if len(font_EN) > 1 or font_EN[0] != rule[key].decode():
+                        if len(font_EN) > 1 or font_EN[0] != rule[key]:
                             rp.write('    '+errorTypeDescrip[key]+'是')
                             if location not in['menuFirst','menuSecond','menuThird']:
                                 comment_txt.write(errorTypeDescrip[key]+'是')
@@ -754,7 +750,6 @@ def check_out(rule,to_check,locate,paraNum,paragr):
                                 comment_txt.write('正确应为：'+rule[key]+'\n')
                             errorInfo.append('\'type\':\''+errorTypeName[key]+'\',\'correct\':\''+rule[key]+'\'')
                             rp1.write(str(paraNum)+'_'+locate+'_error_'+ key+'_'+ rule[key]+'\n')
-
                 else:
                     if to_check[key] != rule[key]:
                         rp.write('    '+errorTypeDescrip[key]+'是'+to_check[key]+'  正确应为：'+rule[key]+'\n')
