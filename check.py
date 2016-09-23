@@ -105,7 +105,6 @@ def assign_fd(node,d):
             if has_key(detail,'ascii'):
                 d['fontEN'] = get_val(detail,'ascii').encode(Unicode_bt)
 #--------------------------------------------
-        
         elif _check_element_is(detail,'sz'):
             d['fontSize'] = get_val(detail,'val')
 
@@ -603,10 +602,114 @@ def check_out(rule,to_check,locate,paraNum,paragr):
     if locate in checkItemDct.keys():
         #关键词这里比较特殊，要深入para内部分析run的rpr来看关键词内容的格式
         if locate == 'abstr5':
+            for key in ['paraGrade','paraAlign','paraSpace','paraFrontSpace','paraAfterSpace','paraIsIntent']:
+                if key == 'paraIsIntent':#对于缩进，特别处理
+                    if islist == 0:
+                        #print '00000000000000000',to_check['paraIsIntent1'],to_check['paraIsIntent']
+                        if to_check['paraIsIntent1'] != '未获取属性值' and to_check['paraIsIntent1'] != '0':
+                            if to_check['paraIsIntent1'] != '200' and rule['paraIsIntent'] == '1':
+                                rp1.write(str(paraNum)+'_'+locate+'_'+'error_paraIsIntent1_200\n')
+                                rp.write(to_check['paraIsIntent1']+"段落缩进有误1\n")
+                                if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
+                                    comment_txt.write("段落缩进有误\n")
+                            elif rule['paraIsIntent'] == '0':
+                                rp1.write(str(paraNum)+'_'+locate+'_'+'error_paraIsIntent1_0\n')
+                                rp.write(to_check['paraIsIntent1']+"段落缩进有误2\n")
+                                if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
+                                    comment_txt.write("段落缩进有\n")
+                        else:
+                            #if to_check['paraIsIntent'] != str(int(rule['paraIsIntent'])*int(rule[key])*20):
+                            if int(to_check['paraIsIntent']) > 0 and rule['paraIsIntent'] is '0':#这里做一个粗略的设定，因为要是按照上面注释的一行来执行，错误率太高了
+                                rp1.write(str(paraNum)+'_'+locate+'_'+'error_paraIsIntent_'+str(20*int(to_check['fontSize'])*int(rule[key]))+'\n')
+                                rp.write(to_check['paraIsIntent']+"段落缩进有误3\n")
+                                if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
+                                    comment_txt.write("段落缩进有误\n")
+                            elif int(to_check['paraIsIntent']) < 100 and rule[key] == '1':
+                                rp1.write(str(paraNum)+'_'+locate+'_'+'error_paraIsIntent_'+str(20*int(to_check['fontSize'])*int(rule[key]))+'\n')
+                                rp.write(to_check['paraIsIntent']+"段落缩进有误4\n")
+                                if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
+                                    comment_txt.write("段落缩进有误\n")
+                        continue
+                else:
+                    if to_check[key] != rule[key]:
+                        rp.write('    '+errorTypeDescrip[key]+'是'+to_check[key]+'  正确应为：'+rule[key]+'\n')
+                        if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
+                            comment_txt.write(errorTypeDescrip[key]+'是'+ to_check[key] + '  正确应为：'+rule[key]+'\n')
+                        errorInfo.append('\'type\':\''+errorTypeName[key]+'\',\'correct\':\''+rule[key]+'\'')
+                        rp1.write(str(paraNum)+'_'+locate+'_error_'+ key+'_'+ rule[key]+'\n')
             if ':' not in ptext and '：' not in ptext:
                 rp.write('warning: 关键词后面没有冒号！\n')
                 comment_txt.write('warning: 关键词后面没有冒号\n')
-            pat = re.compile("关|键|词|：|:| ")
+            pat = re.compile("关|键|词|：|:| | ")
+            nextT = False
+            fCN = True
+            fEN = True
+            fShape = True
+            fSize = True
+            for r in _iter(paragr,"r"):
+                if locate == "abstr5":
+                    rtext = ''
+                    for t in _iter(r, 't'):
+                        rtext += t.text.encode(Unicode_bt, 'ignore')
+                    if (pat.sub("", rtext) != "" and not (('KEY'in rtext or 'key' in rtext or "Key" in rtext or 'WORD'in rtext or'word' in rtext)\
+                 or 'keyword'in rtext or 'Keyword'in rtext or'KEYWORD'in rtext)) or nextT :
+                        locate = 'abstr6'
+                        rule = rules_dct[locate]
+                    if ":" in rtext or "：" in rtext:
+                        nextT = True
+                if fCN:
+                    eastAsia = ""
+                    flag = True
+                    for rfonts in _iter(r,"rFonts"):
+                        flag = False
+                        if has_key(rfonts,"eastAsia"):
+                            eastAsia = get_val(rfonts,"eastAsia").encode(Unicode_bt,"ignore")
+                        else:
+                            eastAsia = to_check["fontCN"]
+                    if flag:
+                        eastAsia = to_check["fontCN"]
+                    if eastAsia != rule["fontCN"]:
+                        fCN = False
+                        rp1.write(str(paraNum)+'_'+locate+'_'+'error_fontCN_0\n')
+                if fEN:
+                    ascii = ""
+                    flag = True
+                    for rfonts in _iter(r,"rFonts"):
+                        flag = False
+                        if has_key(rfonts,"ascii"):
+                            ascii = get_val(rfonts,"ascii").encode(Unicode_bt,"ignore")
+                        else:
+                            ascii = to_check["fontEN"]
+                    if flag:
+                        ascii = to_check["fontEN"]
+                    if ascii != rule["fontEN"]:
+                        fEN = False
+                        rp1.write(str(paraNum)+'_'+locate+'_'+'error_fontEN_0\n')
+                if fShape:
+                    rfshape = ""
+                    flag = True
+                    for rb in _iter(r,"b"):
+                        flag = False
+                        if has_key(rb,"val") and get_val(rb,"val") == '0':
+                            rfshape = get_val(rb,"val")
+                        else:
+                            rfshape = "1"
+                    if flag:
+                        rfshape = to_check["fontShape"]
+                    if rfshape != rule["fontShape"]:
+                        fShape = False
+                        rp1.write(str(paraNum) + '_' + locate + '_' + 'error_fontShape_0\n')
+                if fSize:
+                    rfsize = ""
+                    flag = True
+                    for rsize in _iter(r,"sz"):
+                        flag = False
+                        rfsize = get_val(rsize,"val")
+                    if flag:
+                        rfsize = to_check["fontSize"]
+                    if rfsize != rule["fontSize"]:
+                        fSize = False
+                        rp1.write(str(paraNum) + '_' + locate + '_' + 'error_fontSize_0\n')
         else:
             for key in checkItemDct[locate]:
                 if key == 'paraIsIntent':#对于缩进，特别处理
