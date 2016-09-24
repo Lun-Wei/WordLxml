@@ -79,7 +79,7 @@ def init_fd(d):
     d['paraAlign']='both'
     d['fontShape']='0'
     d['paraSpace']='240'
-    d['paraIsIntent']='0'
+    d['paraIsIntent']="0"
     d['paraIsIntent1']='0'
     d['paraFrontSpace']='0'
     d['paraAfterSpace']='0'
@@ -263,16 +263,20 @@ def second_locate():
             cur_part = part[paraNum]
         if cur_part == 'body':
             #------hsy add object detection July.13.2016--
+            flag = 0
             for node in paragr.iter(tag = etree.Element):
                 if _check_element_is(node,'r'):
                     for innode in node.iter(tag = etree.Element):
                         if _check_element_is(innode,'object') or _check_element_is(innode,'drawing'):
+                            flag = 1
                             cur_state = locate[paraNum] = 'object'
                             break
                 if _check_element_is(node,'bookmarkStart'):
                     if node.values()[1][:4] == '_Ref':
                         if node.values()[1][4:] in reference:
                                 mentioned.append(node.values()[1][4:])
+            if flag == 1:
+                continue
             #------end
         if cur_part == 'cover':
             if '毕业设计'in text:
@@ -713,6 +717,11 @@ def check_out(rule,to_check,locate,paraNum,paragr):
         else:
             for key in checkItemDct[locate]:
                 if key == 'paraIsIntent':#对于缩进，特别处理
+                    if locate == 'objectTitle':
+                        print paraNum
+                        print rule[key]
+                        print to_check['paraIsIntent1'],to_check['paraIsIntent']
+                        print ""
                     if islist == 0:
                         #print '00000000000000000',to_check['paraIsIntent1'],to_check['paraIsIntent']
                         if to_check['paraIsIntent1'] != '未获取属性值' and to_check['paraIsIntent1'] != '0':
@@ -1045,8 +1054,13 @@ def graphOrExcelTitle(ObjectFlag,ptext,paraNum,paragr):
         if not found:
             rp.write('    warning: 此图注没被引用过' + ptext + '\n' )
                 
+def containchildnode(parent,child):
+    for node in parent:
+        if _check_element_is(node,child):
+            return True
+    return False
+
 startTime=time.time()
-#主程序__main__入口差不多在这里了
 xml_from_file,style_from_file = get_word_xml(Docx_Filename)
 xml_tree   = get_xml_tree(xml_from_file)
 style_tree = get_xml_tree(style_from_file)
@@ -1054,14 +1068,9 @@ zipF = zipfile.ZipFile(Docx_Filename)
 numbering_content = zipF.read("word/numbering.xml")
 numbering_tree = etree.fromstring(numbering_content)
 rules_dct=read_rules(Rule_Filename)
-
-Part='start'
-previousL='unknown'
-
 part = {}
 locate = {}
 paraNum=0
-
 #hsy
 reference = []
 spaceNeeded = []
@@ -1070,7 +1079,6 @@ ObjectFlag=0
 empty_para=0
 #参考文献字典zwl
 ref_dic = {}
-#
 rp = open('check_out.txt','w')
 rp1 = open('check_out1.txt','w')
 rp2 = open('space.txt','w')
@@ -1078,9 +1086,6 @@ comment_txt = open("comment.txt","w")
 #sys.exit()
 reference = first_locate()
 warninglist = second_locate()
-
-eInfo = ''
-section_seq = 0
 rp.write('''论文格式检查报告文档使用说明：
 *****此版本为初次上线测试版，难免存在误判等许多问题，遇到误判时请谅解，并可以将问题反馈给我们完善程序∧_∧*****
 各字段值说明：
@@ -1095,11 +1100,10 @@ warning信息表示可能存在的问题，不一定准确
 p_format={}.fromkeys(['fontCN','fontEN','fontSize','paraAlign','fontShape','paraSpace',
                          'paraIsIntent','paraFrontSpace','paraAfterSpace','paraGrade'])
 for paragr in _iter(xml_tree,'p'):
-#以<w:p>为最小单位迭代
     paraNum +=1
     if paragr.getparent().tag == '%s%s'% (word_schema,'txbxContent'):
         continue
-    ptext=get_ptext(paragr)
+    ptext = get_ptext(paragr)
     if paraNum in locate.keys():
         location = locate[paraNum]
     rp.write(str(paraNum) + ' ' + ptext + ' ' + location + '\n')
@@ -1116,7 +1120,8 @@ for paragr in _iter(xml_tree,'p'):
             if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
                 comment_txt.write("correct\n")
         continue
-    if not is_chinese(ptext.decode(Unicode_bt)[0]) and not (ptext.decode(Unicode_bt)[0] >= '\0' and ptext.decode(Unicode_bt)[0] <= chr(127)):
+    if not is_chinese(ptext.decode(Unicode_bt)[0]) and not (ptext.decode(Unicode_bt)[0] >= '\0' and ptext.decode(Unicode_bt)[0] <= chr(127)) and \
+            not (ptext.startswith("（") or ptext.startswith("）")):
         if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
             comment_txt.write("correct\n")
         continue
@@ -1129,9 +1134,23 @@ for paragr in _iter(xml_tree,'p'):
         comment_txt.write("correct\n")
         continue
     first_text = 0
+    for r in _iter(paragr,"r"):
+        rtext = ""
+        if containchildnode(r,"tab"):
+            rp.write("段首有tab键")
+            rp1.write(str(paraNum) + '_' + 'paraStart' + '_error_' + 'startWithTabs' + '_0\n')
+            break
+        pat = re.compile(' |　+')
+        for t in _iter(r, 't'):
+            rtext += t.text.encode(Unicode_bt, 'ignore')
+        if len(pat.sub("", rtext)) == 0:
+            continue
+        else:
+            break
     if location != 'taskbook' and (ptext.startswith(" ") or ptext.startswith("　")):
         rp.write("    段首有空格\n")
         rp1.write(str(paraNum)+'_'+'paraStart'+'_error_'+'startWithSpace'+'_0\n')
+
     contain_ref(paragr,paraNum)
     
     if location in rules_dct.keys():
@@ -1139,7 +1158,7 @@ for paragr in _iter(xml_tree,'p'):
         errorInfo = check_out(rules_dct[location],p_format,location,paraNum,paragr)
     else:
         errorInfo=''
-    if errorInfo :
+    if errorInfo:
         pass
     else:
         rp.write('    检查： 格式正确\n')

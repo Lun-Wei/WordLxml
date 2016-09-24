@@ -126,12 +126,6 @@ def modify(xml_tree,errorlist):
                             rtext += t.text.encode(Unicode_bt,'ignore')
                         if (pat.sub("", rtext) != "" and not (('KEY'in rtext or 'key' in rtext or "Key" in rtext or 'WORD'in rtext or'word' in rtext)\
                  or 'keyword'in rtext or 'Keyword'in rtext or'KEYWORD'in rtext)) or nextT:
-                            print errorlist[listCount]['paraNum']
-                            print errorlist[listCount]['location']
-                            print errorlist[listCount]['type']
-                            print pat.sub("", rtext)
-                            print rtext
-                            print ""
                             locate = 'abstr6'
                         if ":" in rtext or "£º" in rtext:
                             nextT = True
@@ -152,6 +146,19 @@ def modify(xml_tree,errorlist):
                             modify_rpr(r,'b','val','1')
                         elif locate == 'abstr6':
                             modify_rpr(r,'b','val','0')
+                listCount += 1
+            elif errorlist[listCount]['type'] == 'startWithTabs':
+                for r in _iter(paragr, 'r'):
+                    rtext = ""
+                    for tab in _iter(r,"tab"):
+                        r.remove(tab)
+                    pat = re.compile(' |¡¡+')
+                    for t in _iter(r, 't'):
+                        rtext = t.text.encode(Unicode_bt, 'ignore')
+                    if len(pat.sub("", rtext)) == 0:
+                        continue
+                    else:
+                        break
                 listCount += 1
             elif errorlist[listCount]['type'] == "startWithSpace":
                 pat = re.compile(' |¡¡+')
