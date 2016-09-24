@@ -219,6 +219,25 @@ def modify(xml_tree,errorlist):
                         #print etree.tostring(pPr,pretty_print = True)
                         break
                 listCount = listCount + 1
+            elif errorlist[listCount]['type'] == 'paraleft' or errorlist[listCount]['type'] == 'paraleftChars':
+                for pPr in paragr:
+                    if _check_element_is(pPr, 'pPr'):
+                        found_ind = False
+                        # print etree.tostring(pPr,pretty_print = True)
+                        for ind in pPr:
+                            if _check_element_is(ind, 'ind'):
+                                found_ind = True
+                                ind.set('%s%s' % (word_schema, 'leftChars'), '0')
+                                ind.set('%s%s' % (word_schema, 'left'), '0')
+                                break
+                        if found_ind == False:
+                            pPr.insert(0, etree.Element('%s%s' % (word_schema, 'ind')))
+                            ind = pPr[0]
+                            ind.set('%s%s' % (word_schema, 'firstLineChars'), '0')
+                            ind.set('%s%s' % (word_schema, 'firstLine'), '0')
+                        # print etree.tostring(pPr,pretty_print = True)
+                        break
+                listCount = listCount + 1
             elif errorlist[listCount]['type'] == 'paraSpace':
                 for pPr in paragr:
                     if _check_element_is(pPr,'pPr'):
@@ -271,39 +290,51 @@ def modify(xml_tree,errorlist):
                         break
                 listCount = listCount + 1
             elif errorlist[listCount]['type'] == 'fontCN':
-                rPr_first = True
-                for rPr in paragr.iter(tag=etree.Element):
-                    found_node = False
-                    if _check_element_is(rPr,'rPr'):
-                        for node in rPr:
-                            if _check_element_is(node,'rFonts'):
-                                found_node = True
+                for r in _iter(paragr,"r"):
+                    found_rPr = False
+                    for rPr in r.iter(tag=etree.Element):
+                        if _check_element_is(rPr,'rPr'):
+                            found_rPr = True
+                            found_node = False
+                            for node in rPr:
+                                if _check_element_is(node,'rFonts'):
+                                    found_node = True
+                                    node.set('%s%s' %(word_schema,'eastAsia'),errorlist[listCount]['rightValue'])
+                                    break
+                            if found_rPr == True and found_node == False:
+                                rPr.insert(0,etree.Element('%s%s' %(word_schema,'rFonts')))
+                                node = rPr[0]
                                 node.set('%s%s' %(word_schema,'eastAsia'),errorlist[listCount]['rightValue'])
-                                node.set('%s%s' %(word_schema,'ascii'),"Times New Roman")
-                                break
-                        if rPr_first == True and found_node == False:
-                            rPr.insert(0,etree.Element('%s%s' %(word_schema,'rFonts')))
-                            node = rPr[0]
-                            node.set('%s%s' %(word_schema,'eastAsia'),errorlist[listCount]['rightValue'])
-                            node.set('%s%s' %(word_schema,'ascii'),"Times New Roman")
-                        rPr_first = False  
+                    if found_rPr == False:
+                        r.insert(0,etree.Element('%s%s' %(word_schema,'rPr')))
+                        rPr = r[0]
+                        rPr.insert(0,etree.Element('%s%s' %(word_schema,'rFonts')))
+                        node = rPr[0]
+                        node.set('%s%s' %(word_schema,'eastAsia'),errorlist[listCount]['rightValue'])
                 listCount = listCount + 1
             elif errorlist[listCount]['type'] == 'fontEN':
-                rPr_first = True
-                for rPr in paragr.iter(tag=etree.Element):
-                    found_node = False
-                    if _check_element_is(rPr,'rPr'):
-                        for node in rPr:
-                            if _check_element_is(node,'rFonts'):
-                                found_node = True
+                for r in _iter(paragr,"r"):
+                    found_rPr = False
+                    for rPr in r.iter(tag=etree.Element):
+                        if _check_element_is(rPr,'rPr'):
+                            found_rPr = True
+                            found_node = False
+                            for node in rPr:
+                                if _check_element_is(node,'rFonts'):
+                                    found_node = True
+                                    node.set('%s%s' %(word_schema,'ascii'),errorlist[listCount]['rightValue'])
+                                    break
+                            if found_rPr == True and found_node == False:
+                                rPr.insert(0,etree.Element('%s%s' %(word_schema,'rFonts')))
+                                node = rPr[0]
                                 node.set('%s%s' %(word_schema,'ascii'),errorlist[listCount]['rightValue'])
-                                break
-                        if rPr_first == True and found_node == False:
-                            rPr.insert(0,etree.Element('%s%s' %(word_schema,'rFonts')))
-                            node = rPr[0]
-                            node.set('%s%s' %(word_schema,'ascii'),errorlist[listCount]['rightValue'])
-                        rPr_first = False
-                listCount = listCount + 1 
+                    if found_rPr == False:
+                        r.insert(0,etree.Element('%s%s' %(word_schema,'rPr')))
+                        rPr = r[0]
+                        rPr.insert(0,etree.Element('%s%s' %(word_schema,'rFonts')))
+                        node = rPr[0]
+                        node.set('%s%s' %(word_schema,'ascii'),errorlist[listCount]['rightValue'])
+                listCount = listCount + 1
             elif errorlist[listCount]['type'] == 'fontSize':
                 for r in _iter(paragr,"r"):
                     found_rPr = False
