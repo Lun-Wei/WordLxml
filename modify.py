@@ -131,9 +131,9 @@ def modify(xml_tree,errorlist):
                             nextT = True
                     if errorlist[listCount]['type'] == 'fontCN':
                         if locate == 'abstr5':
-                            modify_rpr(r,'rFonts','eastAsia','黑体'.decode())
+                            modify_rpr(r,'rFonts','eastAsia','黑体'.decode(Unicode_bt))
                         elif locate == 'abstr6':
-                            modify_rpr(r,'rFonts','eastAsia','宋体'.decode())
+                            modify_rpr(r,'rFonts','eastAsia','宋体'.decode(Unicode_bt))
                     elif errorlist[listCount]['type'] == 'fontEN':
                         modify_rpr(r,'rFonts','ascii','Times New Roman')
                     elif errorlist[listCount]['type'] == 'fontSize':
@@ -233,8 +233,8 @@ def modify(xml_tree,errorlist):
                         if found_ind == False:
                             pPr.insert(0, etree.Element('%s%s' % (word_schema, 'ind')))
                             ind = pPr[0]
-                            ind.set('%s%s' % (word_schema, 'firstLineChars'), '0')
-                            ind.set('%s%s' % (word_schema, 'firstLine'), '0')
+                            ind.set('%s%s' % (word_schema, 'leftChars'), '0')
+                            ind.set('%s%s' % (word_schema, 'left'), '0')
                         # print etree.tostring(pPr,pretty_print = True)
                         break
                 listCount = listCount + 1
@@ -335,6 +335,15 @@ def modify(xml_tree,errorlist):
                         node = rPr[0]
                         node.set('%s%s' %(word_schema,'ascii'),errorlist[listCount]['rightValue'])
                 listCount = listCount + 1
+            elif errorlist[listCount]['type'] == 'fontTheme':
+                for rPr in _iter(paragr, "rPr"):
+                    if rPr.getparent().tag != "%s%s" % (word_schema, "r"):
+                        continue
+                    for rFonts in _iter(rPr, "rFonts"):
+                        for theme in ['asciiTheme', 'cstheme', 'eastAsiaTheme', 'hAnsiTheme']:
+                            if has_key(rFonts, theme):
+                                rFonts.set('%s%s' %(word_schema,theme),"")
+                listCount += 1
             elif errorlist[listCount]['type'] == 'fontSize':
                 for r in _iter(paragr,"r"):
                     found_rPr = False

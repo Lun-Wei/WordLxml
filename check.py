@@ -39,7 +39,6 @@ def get_ptext(w_p):
 #-modified by zqd 20160125-----------------------
     for node in w_p.iter(tag=etree.Element):
         if _check_element_is(node,'t'):
-#-----------------------------------------------
             ptext += node.text
     return ptext.encode(Unicode_bt,'ignore') #被检测的论文中可能出现奇怪的根本无法解码字符比如该同学从其他地方乱粘贴东西，因此加上个ignore参数忽略非法字符
 
@@ -132,7 +131,6 @@ def assign_fd(node,d):
                 d['paraAfterSpace']= get_val(detail,'after')
 #--------20160313 zqd----------------------------------------
         elif _check_element_is(detail,'ind'):
-            #悬挂缩进生成错误信息
             if has_key(detail,'left'):
                 d['left'] = get_val(detail,"left")
             if has_key(detail,"leftChars"):
@@ -141,8 +139,6 @@ def assign_fd(node,d):
                 d['paraIsIntent']=get_val(detail,'firstLine')
             if has_key(detail,'firstLineChars'):
                 d['paraIsIntent1']=get_val(detail,'firstLineChars')
-                #print d['paraIsIntent']
-                #在这里两种缩进是不同的，具体看xml文档，firstLineChars优先级高
 #-------------------------------------------------
         elif _check_element_is(detail,'outlineLvl'):
             d['paraGrade'] = get_val(detail,'val')
@@ -205,9 +201,9 @@ def first_locate():
     reference = []
     current_part = ''
     for paragr in _iter(xml_tree,'p'):
-        paraNum +=1
-        text=get_ptext(paragr)
-        if not text or text == '' or text == '':
+        paraNum += 1
+        text = get_ptext(paragr)
+        if not text or text == ' ' or text == '':
             continue
         for r in paragr.iter(tag=etree.Element):
             if _check_element_is(r, 'r'):
@@ -237,15 +233,15 @@ def first_locate():
         elif text.startswith('附录'):
             current_part = part[paraNum] = 'appendix'
     if not 'statement' in part.values():
-        print 'warning statement doesnot exsit'
+        print 'warning: statement doesnot exsit'
     if not 'spine' in part.values():
-        print 'warning spine'
+        print 'warning: spine'
     if not 'abstract' in part.values():
-        print 'warning abstract'
+        print 'warning: abstract'
     if not 'body' in part.values():
-        print 'warning body'
+        print 'warning: body'
     if not 'menu' in part.values():
-        print 'warning menu'
+        print 'warning: menu'
     return reference
 
 def second_locate():
@@ -261,8 +257,6 @@ def second_locate():
     for paragr in _iter(xml_tree,'p'):
         paraNum +=1
         text=get_ptext(paragr)
-        if text == '' or text == '':
-            continue
         if paraNum in part.keys():
             cur_part = part[paraNum]
         if cur_part == 'body':
@@ -282,6 +276,8 @@ def second_locate():
             if flag == 1:
                 continue
             #------end
+        if text == ' ' or text == '':
+            continue
         if cur_part == 'cover':
             if '毕业设计'in text:
                 cur_state = locate[paraNum] = 'cover2'
@@ -311,8 +307,7 @@ def second_locate():
             elif '时间'in last_text and  '年' in last_text and '月' in last_text and title in text:
                 last_text = ''
                 cur_state = locate[paraNum] = 'abstr1'
-                
-            elif '学'and'生'in text:
+            elif '学' and '生'in text:
                 cur_state = locate[paraNum] = 'abstr2'
         elif cur_part == 'abstract':
             if re.match(r'摘 *要',text):
@@ -404,6 +399,8 @@ def second_locate():
                     cur_state = locate[paraNum] = 'firstTitle'
                 elif re.match(r'致 *谢',text):
                     cur_state = locate[paraNum] = 'firstTitle'
+                elif re.match(r'绪 *论',text):
+                    cur_state = locate[paraNum] = 'firstTitle'
                 else:
                     cur_state = locate[paraNum] = 'body'
         elif cur_part == 'refer':
@@ -453,8 +450,8 @@ def analyse(text):
     pat1 = re.compile('[0-9]+')#以数字开头的正则表达式
     pat2 = re.compile('[0-9]+\\.[0-9]')#以X.X开头的正则表达式
     pat3 = re.compile('[0-9]+\\.[0-9]\\.[0-9]')#以X.X.X开头的正则表达式
-    pat4 = re.compile('图(\s)*[0-9]+(\\.|-)[0-9]')#图标题的正则表达式
-    pat5 = re.compile('表(\s)*[0-9]+(\\.|-)[0-9]')#表标题的正则表达式
+    pat4 = re.compile('图(\s)*[0-9]+((\\.|-)[0-9])*')#图标题的正则表达式
+    pat5 = re.compile('表(\s)*[0-9]+((\\.|-)[0-9])*')#表标题的正则表达式
 
     #20160107 zqd -----------------------------------------------------------------------
     if pat1.match(text) and len(text)<70:
@@ -573,10 +570,10 @@ def check_out(rule,to_check,locate,paraNum,paragr):
     position = ['fontCN','fontEN','fontSize','fontShape','paraGrade','paraAlign','paraSpace','paraFrontSpace','paraAfterSpace','paraIsIntent']
     #这个字典的定义是为了避免对每个para都把规则字典里十个字段检查一遍，根据para的位置有选择有针对性的检查
     checkItemDct={'cover1':['fontCN','fontEN','fontSize','fontShape'],
-                  'cover2':['fontCN','fontSize','paraAlign'],
-                  'cover3':['fontCN','fontSize','paraAlign'],
+                  'cover2':['fontCN','fontSize','paraAlign','paraIsIntent'],
+                  'cover3':['fontCN','fontSize','paraAlign','paraIsIntent'],
                   'cover4':['fontCN','fontSize','fontShape'],
-                  'cover5':['fontCN','fontSize','fontShape','paraAlign'],
+                  'cover5':['fontCN','fontSize','fontShape','paraAlign','paraIsIntent'],
                   'cover6':['fontCN','fontSize','fontShape','paraAlign'],
                   'statm1':position,
                   'statm2':position,
@@ -613,37 +610,42 @@ def check_out(rule,to_check,locate,paraNum,paragr):
                 if key == 'paraIsIntent':#对于缩进，特别处理
                     if to_check['leftChars'] != '未获取属性值' and to_check['leftChars'] != '0':
                         rp1.write(str(paraNum) + '_' + locate + '_' + 'error_paraleftChars_0\n')
-                        rp.write(to_check['leftChars'] + "段落有左侧缩进\n")
+                        rp.write('    '+ to_check['leftChars'] + "段落有左侧缩进\n")
                         if paragr.getparent().tag != "%s%s" % (word_schema, "sdtContent"):
                             comment_txt.write("段落缩进有左侧缩进\n")
+                        errorInfo.append('\'type\':\'' + errorTypeName[key] + '\',\'correct\':\'0\'')
                     elif to_check['left'] != '未获取属性值' and to_check['left'] != '0':
                         rp1.write(str(paraNum) + '_' + locate + '_' + 'error_paraleft_0\n')
-                        rp.write(to_check['left'] + "段落有左侧缩进\n")
+                        rp.write('    '+ to_check['left'] + "段落有左侧缩进\n")
                         if paragr.getparent().tag != "%s%s" % (word_schema, "sdtContent"):
                             comment_txt.write("段落缩进有左侧缩进\n")
+                        errorInfo.append('\'type\':\'' + errorTypeName[key] + '\',\'correct\':\'0\'')
                     if to_check['paraIsIntent1'] != '未获取属性值' and to_check['paraIsIntent1'] != '0':
                         if to_check['paraIsIntent1'] != '200' and rule['paraIsIntent'] == '1':
                             rp1.write(str(paraNum)+'_'+locate+'_'+'error_paraIsIntent1_200\n')
-                            rp.write(to_check['paraIsIntent1']+"段落首行缩进有误\n")
+                            rp.write('    '+ to_check['paraIsIntent1']+"段落首行缩进有误\n")
                             if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
                                 comment_txt.write("段落首行缩进有误\n")
+                            errorInfo.append('\'type\':\'' + errorTypeName[key] + '\',\'correct\':\'200\'')
                         elif rule['paraIsIntent'] == '0':
                             rp1.write(str(paraNum)+'_'+locate+'_'+'error_paraIsIntent1_0\n')
-                            rp.write(to_check['paraIsIntent1']+"段落缩进有误\n")
+                            rp.write('    '+ to_check['paraIsIntent1']+"段落缩进有误\n")
                             if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
                                 comment_txt.write("段落首行缩进有误\n")
+                            errorInfo.append('\'type\':\'' + errorTypeName[key] + '\',\'correct\':\'0\'')
                     else:
-                        #if to_check['paraIsIntent'] != str(int(rule['paraIsIntent'])*int(rule[key])*20):
-                        if int(to_check['paraIsIntent']) > 0 and rule['paraIsIntent'] is '0':#这里做一个粗略的设定，因为要是按照上面注释的一行来执行，错误率太高了
+                        if int(to_check['paraIsIntent']) > 0 and rule['paraIsIntent'] is '0':
                             rp1.write(str(paraNum)+'_'+locate+'_'+'error_paraIsIntent_'+str(20*int(to_check['fontSize'])*int(rule[key]))+'\n')
-                            rp.write(to_check['paraIsIntent']+"段落缩进首行有误\n")
+                            rp.write('    '+ to_check['paraIsIntent']+"段落缩进首行有误\n")
                             if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
                                 comment_txt.write("段落首行缩进有误\n")
-                        elif int(to_check['paraIsIntent']) < 100 and rule[key] == '1':
+                            errorInfo.append('\'type\':\'' + errorTypeName[key] + '\',\'correct\':\'0\'')
+                        elif int(to_check['paraIsIntent']) < 100 and rule[key] == '1':#这里做一个粗略的设定，因为要是按照上面注释的一行来执行，错误率太高了
                             rp1.write(str(paraNum)+'_'+locate+'_'+'error_paraIsIntent_'+str(20*int(to_check['fontSize'])*int(rule[key]))+'\n')
-                            rp.write(to_check['paraIsIntent']+"段落首行缩进有误\n")
+                            rp.write('    '+ to_check['paraIsIntent']+"段落首行缩进有误\n")
                             if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
                                 comment_txt.write("段落首行缩进有误\n")
+                            errorInfo.append('\'type\':\'' + errorTypeName[key] + '\',\'correct\':\'200\'')
                     continue
                 else:
                     if to_check[key] != rule[key]:
@@ -653,14 +655,16 @@ def check_out(rule,to_check,locate,paraNum,paragr):
                         errorInfo.append('\'type\':\''+errorTypeName[key]+'\',\'correct\':\''+rule[key]+'\'')
                         rp1.write(str(paraNum)+'_'+locate+'_error_'+ key+'_'+ rule[key]+'\n')
             if ':' not in ptext and '：' not in ptext:
-                rp.write('warning: 关键词后面没有冒号！\n')
+                rp.write('    '+ 'warning: 关键词后面没有冒号！\n')
                 comment_txt.write('warning: 关键词后面没有冒号\n')
+                errorInfo.append('\'type\':\'' + "关键词后面没有冒号" + '\',\'correct\':\''+ '\'')
             pat = re.compile("关|键|词|：|:| | ")
             nextT = False
             fCN = True
             fEN = True
             fShape = True
             fSize = True
+            ftheme = True
             for r in _iter(paragr,"r"):
                 if locate == "abstr5":
                     rtext = ''
@@ -672,6 +676,12 @@ def check_out(rule,to_check,locate,paraNum,paragr):
                         rule = rules_dct[locate]
                     if ":" in rtext or "：" in rtext:
                         nextT = True
+                if ftheme and containThemeFonts(r):
+                    ftheme = False
+                    rp1.write(str(paraNum) + '_' + locate + '_' + 'error_fontTheme_0\n')
+                    rp.write("    当前段落部分为主题字体\n")
+                    comment_txt.write("当前段落部分为主题字体\n")
+                    errorInfo.append("当前段落部分为主题字体")
                 if fCN:
                     eastAsia = ""
                     flag = True
@@ -686,6 +696,9 @@ def check_out(rule,to_check,locate,paraNum,paragr):
                     if eastAsia != rule["fontCN"]:
                         fCN = False
                         rp1.write(str(paraNum)+'_'+locate+'_'+'error_fontCN_0\n')
+                        rp.write("    当前段落部分中文字体有错\n")
+                        comment_txt.write("当前段落部分中文字体有误\n")
+                        errorInfo.append("当前段落部分中文字体有误")
                 if fEN:
                     ascii = ""
                     flag = True
@@ -700,6 +713,9 @@ def check_out(rule,to_check,locate,paraNum,paragr):
                     if ascii != rule["fontEN"]:
                         fEN = False
                         rp1.write(str(paraNum)+'_'+locate+'_'+'error_fontEN_0\n')
+                        rp.write("    当前段落部分英文字体有错\n")
+                        comment_txt.write("当前段落部分英文字体有误\n")
+                        errorInfo.append("当前段落部分英文字体有误")
                 if fShape:
                     rfshape = ""
                     flag = True
@@ -714,6 +730,9 @@ def check_out(rule,to_check,locate,paraNum,paragr):
                     if rfshape != rule["fontShape"]:
                         fShape = False
                         rp1.write(str(paraNum) + '_' + locate + '_' + 'error_fontShape_0\n')
+                        rp.write("    当前段落部分字体加粗有误\n")
+                        comment_txt.write("当前段落部分字体加粗有误\n")
+                        errorInfo.append("当前段落部分字体加粗有误")
                 if fSize:
                     rfsize = ""
                     flag = True
@@ -725,45 +744,55 @@ def check_out(rule,to_check,locate,paraNum,paragr):
                     if rfsize != rule["fontSize"]:
                         fSize = False
                         rp1.write(str(paraNum) + '_' + locate + '_' + 'error_fontSize_0\n')
+                        rp.write("    当前段落部分英文字体大小有误\n")
+                        comment_txt.write("当前段落部分英文字体大小有误\n")
+                        errorInfo.append("当前段落部分英文字体大小有误")
         else:
             for key in checkItemDct[locate]:
                 if key == 'paraIsIntent':#对于缩进，特别处理
                     if islist == 0:
                         if to_check['leftChars']!='未获取属性值' and to_check['leftChars']!='0':
                             rp1.write(str(paraNum) + '_' + locate + '_' + 'error_paraleftChars_0\n')
-                            rp.write(to_check['leftChars'] + "段落有左侧缩进\n")
+                            rp.write('    '+ to_check['leftChars'] + "段落有左侧缩进\n")
                             if paragr.getparent().tag != "%s%s" % (word_schema, "sdtContent"):
                                 comment_txt.write("段落缩进有左侧缩进\n")
+                            errorInfo.append("段落左侧缩进有误")
                         elif to_check['left'] != '未获取属性值' and to_check['left'] != '0':
                             rp1.write(str(paraNum) + '_' + locate + '_' + 'error_paraleft_0\n')
-                            rp.write(to_check['left'] + "段落有左侧缩进\n")
+                            rp.write('    '+ to_check['left'] + "段落有左侧缩进\n")
                             if paragr.getparent().tag != "%s%s" % (word_schema, "sdtContent"):
                                 comment_txt.write("段落缩进有左侧缩进\n")
-                        #print '00000000000000000',to_check['paraIsIntent1'],to_check['paraIsIntent']
+                            errorInfo.append("段落左侧缩进有误")
                         if to_check['paraIsIntent1'] != '未获取属性值' and to_check['paraIsIntent1'] != '0':
                             if to_check['paraIsIntent1'] != '200' and rule['paraIsIntent'] == '1':
                                 rp1.write(str(paraNum)+'_'+locate+'_'+'error_paraIsIntent1_200\n')
-                                rp.write(to_check['paraIsIntent1']+"段落首行缩进有误\n")
+                                rp.write('    '+ to_check['paraIsIntent1']+"段落首行缩进有误\n")
                                 if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
                                     comment_txt.write("段落首行缩进有误\n")
+                                errorInfo.append("段落首行缩进有误")
                             elif rule['paraIsIntent'] == '0':
                                 rp1.write(str(paraNum)+'_'+locate+'_'+'error_paraIsIntent1_0\n')
-                                rp.write(to_check['paraIsIntent1']+"段落首行缩进有误\n")
+                                rp.write('    '+ to_check['paraIsIntent1']+"段落首行缩进有误\n")
                                 if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
                                     comment_txt.write("段落首行缩进有误\n")
+                                errorInfo.append("段落首行缩进有误")
                         else:
                             #if to_check['paraIsIntent'] != str(int(rule['paraIsIntent'])*int(rule[key])*20):
-                            if int(to_check['paraIsIntent']) > 0 and rule['paraIsIntent'] is '0':#这里做一个粗略的设定，因为要是按照上面注释的一行来执行，错误率太高了
+                            if int(to_check['paraIsIntent']) > 0 and rule['paraIsIntent'] is '0':
                                 rp1.write(str(paraNum)+'_'+locate+'_'+'error_paraIsIntent_'+str(20*int(to_check['fontSize'])*int(rule[key]))+'\n')
-                                rp.write(to_check['paraIsIntent']+"段落首行缩进有误\n")
+                                rp.write('    '+ to_check['paraIsIntent']+"段落首行缩进有误\n")
                                 if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
                                     comment_txt.write("段落首行缩进有误\n")
-                            elif int(to_check['paraIsIntent']) < 100 and rule[key] == '1':
+                                errorInfo.append("段落首行缩进有误")
+                            elif int(to_check['paraIsIntent']) < 100 and rule[key] == '1':#这里做一个粗略的设定，因为要是按照上面注释的一行来执行，错误率太高了
                                 rp1.write(str(paraNum)+'_'+locate+'_'+'error_paraIsIntent_'+str(20*int(to_check['fontSize'])*int(rule[key]))+'\n')
-                                rp.write(to_check['paraIsIntent']+"段落首行缩进有误\n")
+                                rp.write('    '+ to_check['paraIsIntent']+"段落首行缩进有误\n")
                                 if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
                                     comment_txt.write("段落首行缩进有误\n")
-                        continue
+                                errorInfo.append("段落首行缩进有误")
+                    else:
+                        pass
+                    continue
                 elif key == "fontSize" or key == "fontShape":
                     font_size = []
                     font_shape = []
@@ -815,7 +844,14 @@ def check_out(rule,to_check,locate,paraNum,paragr):
                 elif key == "fontCN" or key == "fontEN":
                     font_EN = []
                     font_CN = []
+                    ftheme = True
                     for r in _iter(paragr,"r"):
+                        if ftheme and containThemeFonts(r):
+                            ftheme = False
+                            rp1.write(str(paraNum) + '_' + locate + '_' + 'error_fontTheme_0\n')
+                            rp.write("    当前段落部分为主题字体\n")
+                            comment_txt.write("当前段落部分为主题字体\n")
+                            errorInfo.append("当前段落部分为主题字体")
                         rtext = ""
                         for t in _iter(r,"t"):
                             rtext += t.text
@@ -1013,8 +1049,6 @@ def graphOrExcelTitle(ObjectFlag,ptext,paraNum,paragr):
     if ObjectFlag == 1:
         if not graphTitlePattern.match(ptext):
             rp.write('     warning: 找不到对应图注 ----->'+ptext+'\n')
-            #print('     warning: 找不到对应图注 ----->'+ptext)
-        ObjectFlag = 0
     if graphTitlePattern.match(ptext):
         if paraNum - 1 in locate.keys():
             if locate[paraNum - 1] != 'object':
@@ -1076,6 +1110,15 @@ def containchildnode(parent,child):
             return True
     return False
 
+def containThemeFonts(r):
+    for rPr in _iter(r,"rPr"):
+        if rPr.getparent().tag != "%s%s" % (word_schema, "r"):
+            continue
+        for rFonts in _iter(rPr,"rFonts"):
+            for theme in ['asciiTheme','cstheme','eastAsiaTheme','hAnsiTheme']:
+                if has_key(rFonts,theme) and get_val(rFonts,theme)!="" and get_val(rFonts,theme)!="未获取属性值":
+                    return True
+
 startTime=time.time()
 xml_from_file,style_from_file = get_word_xml(Docx_Filename)
 xml_tree   = get_xml_tree(xml_from_file)
@@ -1090,7 +1133,7 @@ paraNum=0
 #hsy
 reference = []
 spaceNeeded = []
-ObjectFlag=0
+ObjectFlag = 0
 #
 empty_para=0
 #参考文献字典zwl
@@ -1127,7 +1170,6 @@ for paragr in _iter(xml_tree,'p'):
         comment_txt.write("Id:"+str(paraNum)+'\n')
     if ptext == ' ' or ptext == '':
         empty_para += 1
-        warnInfo=[]
         if empty_para>=2:
             rp.write(' \n    warning:不允许出现连续空行 \n')
             if paragr.getparent().tag != "%s%s"%(word_schema,"sdtContent"):
@@ -1149,6 +1191,8 @@ for paragr in _iter(xml_tree,'p'):
         ObjectFlag = 1
         comment_txt.write("correct\n")
         continue
+    else:
+        ObjectFlag = 0
     first_text = 0
     for r in _iter(paragr,"r"):
         rtext = ""
